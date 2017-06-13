@@ -3,3 +3,13 @@
 ################################################################################
 
 /.vs
+/Client/bin
+/Client/obj
+/Server
+/ServerApi/bin
+/ServerApi/obj
+/ServerApiTests/bin
+/ServerApiTests/obj
+/Utils/bin
+/Utils/obj
+/ServerApi/appsettings.json
