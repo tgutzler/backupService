@@ -36,24 +36,27 @@ namespace ServerApi.Controllers
         [HttpGet]
         public string Get()
         {
-            return $"There are {_dbService.FileCount} files backed up";
+            var count = _dbService.FileCount;
+            if (count == 1)
+                return $"There is {_dbService.FileCount} file backed up";
+            else
+                return $"There are {_dbService.FileCount} files backed up";
         }
 
-        // GET api/file?parent=&name=
-        //[HttpGet]
-        //public BackedUpFile Get(string parent, string name)
-        //{
-        //    if (string.IsNullOrWhiteSpace(parent) || string.IsNullOrWhiteSpace(name))
-        //    {
-        //        return null;
-        //    }
-
-        //    var file = _dbService.GetFile(name, parent);
-        //    return file;
-        //}
+        [HttpGet("{id}")]
+        public IActionResult Get(int id)
+        {
+            try
+            {
+                return Json(_dbService.GetFile(id));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex);
+            }
+        }
 
         // POST api/file
-
         [HttpPost]
         public IActionResult Post([FromBody] BackedUpFile file)
         {
@@ -62,8 +65,15 @@ namespace ServerApi.Controllers
                 return BadRequest();
             }
 
-            _dbService.AddFile(file);
-            return CreatedAtRoute("api/file", new { id = file.ParentId }, file);
+            try
+            {
+                _dbService.AddFile(file);
+                return Json(file);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex);
+            }
         }
 
         // 1. Disable the form value model binding here to take control of handling 
@@ -159,10 +169,16 @@ namespace ServerApi.Controllers
             }
             else
             {
-                _dbService.AddFile(backedUpFile);
-                var filePath = Path.Combine(_storageOptions.BackupRoot,
-                    backedUpFile.Hash);
-                System.IO.File.Move(tempFilePath, filePath);
+                try
+                {
+                    _dbService.AddFile(backedUpFile);
+                    System.IO.File.Move(tempFilePath,
+                        Path.Combine(_storageOptions.BackupRoot, backedUpFile.Hash));
+                }
+                catch (Exception ex)
+                {
+                    return BadRequest(ex);
+                }
             }
 
             // filePath is where the file is

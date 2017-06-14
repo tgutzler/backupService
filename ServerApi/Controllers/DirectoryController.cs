@@ -23,16 +23,55 @@ namespace ServerApi.Controllers
 
         // GET api/directory
         [HttpGet]
-        public IEnumerable<string> Get()
+        public string Get()
         {
-            return new string[] { "value1", "value2" };
+            var count = _dbService.DirectoryCount;
+            if (count == 1)
+                return $"There is {_dbService.DirectoryCount} directory backed up";
+            else
+                return $"There are {_dbService.DirectoryCount} directories backed up";
         }
 
-        // GET api/directory/s8f4
-        [HttpGet("{hash}")]
-        public BackedUpDirectory Get(string hash)
+        // Get api/directory/1
+        [HttpGet("{id}")]
+        public IActionResult Get(int id)
         {
-            return _dbService.GetDirectory(hash);
+            try
+            {
+                return Json(_dbService.GetDirectory(id));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex);
+            }
+        }
+
+        // GET api/directory/c:\sdf
+        [HttpGet("{path}")]
+        public IActionResult Get(string path)
+        {
+            try
+            {
+                return Json(_dbService.GetDirectory(path));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex);
+            }
+        }
+
+        // GET api/directory/sdf?parentId=1
+        [HttpGet("{name}")]
+        public IActionResult Get(string name, int parentId)
+        {
+            try
+            {
+                return Json(_dbService.GetDirectory(name, parentId));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex);
+            }
         }
 
         // POST api/directory
@@ -44,21 +83,35 @@ namespace ServerApi.Controllers
                 return BadRequest();
             }
 
-            _dbService.AddDirectory(directory);
-            return CreatedAtRoute("api/directory", new { id = directory.Id }, directory);
+            try
+            {
+                _dbService.AddDirectory(directory);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex);
+            }
+            return Json(directory);
         }
 
-        [HttpPut("{hash}")]
-        public IActionResult Update(string hash, [FromBody] BackedUpDirectory directory)
+        [HttpPut]
+        public IActionResult Put([FromBody] BackedUpDirectory directory)
         {
-            if (directory == null)// || MD5(directory.Path) != hash)
+            if (directory == null)
             {
                 return BadRequest();
             }
 
-            if (_dbService.UpdateDirectory(directory))
+            try
             {
-                return new NoContentResult();
+                if (_dbService.UpdateDirectory(directory))
+                {
+                    return Json(directory);
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex);
             }
             
             return NotFound();

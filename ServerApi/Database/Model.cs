@@ -97,6 +97,7 @@ namespace ServerApi.Database
         public string Name { get; set; }
         [DataMember(Name = "Modified")]
         public DateTime Modified { get; set; }
+        [DataMember(Name = "Depth")]
         public UInt32 Depth { get; set; }
         [DataMember(Name = "ParentId")]
         public int? ParentId { get; set; }

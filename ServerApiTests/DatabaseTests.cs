@@ -126,6 +126,11 @@ namespace ServerApiTests
             Assert.True(dir.Directories.Count == 0);
             Assert.True(dir.Files.Count == 0);
             Assert.True(dir.Parent.Id == parent.ParentId);
+
+            dir = _dbService.GetDirectory(child.Name, parent.Id);
+            Assert.True(dir.Id == child.Id);
+            Assert.True(dir.Name == child.Name);
+            Assert.True(dir.ParentId == parent.Id);
         }
     }
 }

@@ -95,6 +95,28 @@ namespace ServerApi.Database
             return dir;
         }
 
+        public BackedUpDirectory GetDirectory(string name, int parentId, bool includeChildren = false, bool includeParent = false)
+        {
+            BackedUpDirectory dir = null;
+            using (var context = new AppDbContext(_dbConnectionConfig))
+            {
+                dir = context.Directories.FirstOrDefault(d => d.ParentId == parentId && d.Name == name);
+                if (dir != null)
+                {
+                    if (includeChildren)
+                    {
+                        context.Files.Where(f => f.ParentId == dir.Id).Load();
+                        context.Directories.Where(d => d.ParentId == dir.Id).Load();
+                    }
+                    if (includeParent)
+                    {
+                        context.Directories.Where(d => d.Id == dir.ParentId).Load();
+                    }
+                }
+            }
+            return dir;
+        }
+
         public BackedUpDirectory GetDirectory(int id, bool includeChildren = false, bool includeParent = false)
         {
             BackedUpDirectory dir = null;
@@ -146,6 +168,14 @@ namespace ServerApi.Database
             }
         }
 
+        public BackedUpFile GetFile(int id)
+        {
+            using (var context = new AppDbContext(_dbConnectionConfig))
+            {
+                return context.Files.FirstOrDefault(f => f.Id == id);
+            }
+        }
+
         public BackedUpFile GetFile(string name, int parentId, bool includeParent = false)
         {
             BackedUpFile file;
@@ -158,6 +188,17 @@ namespace ServerApi.Database
                 }
             }
             return file;
+        }
+
+        public int DirectoryCount
+        {
+            get
+            {
+                using (var context = new AppDbContext(_dbConnectionConfig))
+                {
+                    return context.Directories.Count();
+                }
+            }
         }
 
         public int FileCount
