@@ -9,7 +9,7 @@ namespace Client
         static void Main(string[] args)
         {
             Console.CancelKeyPress += Console_CancelKeyPress;
-            var app = new App("http://localhost:54426/", _cts.Token);
+            var app = new App("http://localhost:52671/", _cts.Token);
 
             app.RunAsync().Wait();
 

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using ServerApi.Database;
+using ServerApi.Interfaces;
 using ServerApi.Options;
 
 namespace ServerApi.Controllers
@@ -46,13 +47,15 @@ namespace ServerApi.Controllers
             }
         }
 
-        // GET api/directory/c:\sdf
-        [HttpGet("{path}")]
-        public IActionResult Get(string path)
+        // GET api/directory
+        [HttpPost]
+        public IActionResult Get([FromBody] BUDirectoryInfo di)
         {
             try
             {
-                return Json(_dbService.GetDirectory(path));
+                return di.ParentId == null ?
+                    Json(_dbService.GetDirectory(di.Path)) :
+                    Json(_dbService.GetDirectory(di.Name, (int)di.ParentId));
             }
             catch (Exception ex)
             {
@@ -61,21 +64,21 @@ namespace ServerApi.Controllers
         }
 
         // GET api/directory/sdf?parentId=1
-        [HttpGet("{name}")]
-        public IActionResult Get(string name, int parentId)
-        {
-            try
-            {
-                return Json(_dbService.GetDirectory(name, parentId));
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex);
-            }
-        }
+        //[HttpGet("{name}")]
+        //public IActionResult Get(string name, int parentId)
+        //{
+        //    try
+        //    {
+        //        return Json(_dbService.GetDirectory(name, parentId));
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return BadRequest(ex);
+        //    }
+        //}
 
         // POST api/directory
-        [HttpPost]
+        [HttpPost("Add")]
         public IActionResult Post([FromBody] BackedUpDirectory directory)
         {
             if (directory == null)
@@ -94,7 +97,7 @@ namespace ServerApi.Controllers
             return Json(directory);
         }
 
-        [HttpPut]
+        [HttpPut("Update")]
         public IActionResult Put([FromBody] BackedUpDirectory directory)
         {
             if (directory == null)

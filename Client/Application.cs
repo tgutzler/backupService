@@ -11,7 +11,7 @@ namespace Client
     internal class App
     {
         CancellationToken _token;
-        List<string> monitorDirs = new List<string> { "C:\\Users\\tom\\Documents\\programming\\C#\\BackupService" };
+        List<string> monitorDirs = new List<string> { @"C:\Users\tom\Documents\programming\C#\BackupService" };
         List<FileSystemWatcher> watchers = new List<FileSystemWatcher>();
         Debouncer _modifiedDebouncer = new Debouncer();
         Debouncer _renamedDebouncer = new Debouncer();
@@ -50,7 +50,7 @@ namespace Client
             // Wait for server to come online
             while (!await _syncEngine.PingAsync().ConfigureAwait(false))
             {
-                await Task.Delay(1000, _token).ConfigureAwait(false);
+                await Task.Delay(100, _token).ConfigureAwait(false);
                 _token.ThrowIfCancellationRequested();
             }
 

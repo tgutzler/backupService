@@ -79,12 +79,26 @@ namespace ServerApi.Database
             using (var context = new AppDbContext(_dbConnectionConfig))
             {
                 int? parentId = null;
+                bool saveRequired = false;
                 foreach (var dirName in dirNames)
                 {
                     dir = context.Directories.FirstOrDefault(d =>
                         ((d.Name == dirName) && (d.ParentId == parentId)));
-                    if (dir == null) break;
+                    if (dir == null)
+                    {
+                        dir = new BackedUpDirectory()
+                        {
+                            Name = dirName,
+                            ParentId = parentId
+                        };
+                        context.Directories.Add(dir);
+                        saveRequired = true;
+                    }
                     parentId = dir.Id;
+                }
+                if (saveRequired)
+                {
+                    context.SaveChanges();
                 }
                 if ((dir != null) && includeChildren)
                 {

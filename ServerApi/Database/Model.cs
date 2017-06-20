@@ -68,6 +68,7 @@ namespace ServerApi.Database
     [DataContract]
     public class BaseItem
     {
+        [DataMember]
         public int Id { get; set; }
         [Timestamp]
         public byte[] RowVersion { get; set; }
@@ -93,28 +94,28 @@ namespace ServerApi.Database
             Files = new List<BackedUpFile>();
         }
 
-        [DataMember(Name = "Name")]
+        [DataMember]
         public string Name { get; set; }
-        [DataMember(Name = "Modified")]
+        [DataMember]
         public DateTime Modified { get; set; }
-        [DataMember(Name = "Depth")]
+        [DataMember]
         public UInt32 Depth { get; set; }
-        [DataMember(Name = "ParentId")]
+        [DataMember]
         public int? ParentId { get; set; }
         public BackedUpDirectory Parent { get; set; }
         public ICollection<BackedUpDirectory> Directories { get; set; }
-        [DataMember(Name = "Files")]
+        [DataMember]
         public ICollection<BackedUpFile> Files { get; set; }
     }
 
     [DataContract(Name = "BackedUpFile")]
     public class BackedUpFile : BaseItem
     {
-        [DataMember(Name = "Name")]
+        [DataMember]
         public string Name { get; set; }
-        [DataMember(Name = "Modified")]
+        [DataMember]
         public DateTime Modified { get; set; }
-        [DataMember(Name = "ParentId")]
+        [DataMember]
         public int ParentId { get; set; }
         public BackedUpDirectory Parent { get; set; }
 
