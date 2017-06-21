@@ -1,24 +1,16 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using ServerApi.Database;
 using ServerApi.Interfaces;
+using Utils;
 
 namespace Client
 {
-    public static class WebApi
-    {
-        public static readonly string GetDirectory = "api/directory";
-        public static readonly string Ping = "api/utils/ping";
-        public static readonly string Upload = "upload";
-    }
-
     internal class SyncEngine
     {
         private HttpClient _client = new HttpClient();
@@ -51,44 +43,46 @@ namespace Client
             return success;
         }
 
-        public async Task SynchroniseAsync(string directoryPath)
+        public async Task<bool> SynchroniseAsync(string directoryPath, int? parentId = null)
         {
             Console.WriteLine($"Press any key to start {directoryPath}");
             Console.ReadKey();
-            var backedupDirectory = await GetDirectoryInfo(directoryPath).ConfigureAwait(false);
+            var backedupDirectory = await GetDirectoryInfo(directoryPath, parentId).ConfigureAwait(false);
+            if (backedupDirectory == null) return false;
+
             var lastWrite = Directory.GetLastWriteTimeUtc(directoryPath);
-            var update = false;
-            if (backedupDirectory != null)
-            {
-                update = true;
-                var files = Directory.GetFiles(directoryPath);
-                foreach (var file in files)
-                {
-                    // Upload file and object, link object to parent
-                    var s = await Upload($"{_serverUri}/{WebApi.Upload}", file).ConfigureAwait(false);
 
-                    var backedUpFile = new BackedUpFile()
-                    {
-                        Name = Path.GetFileName(file),
-                        Modified = Directory.GetLastWriteTimeUtc(file),
-                        ParentId = backedupDirectory.Id
-                    };
-                }
-                foreach (var dir in Directory.GetDirectories(directoryPath))
+            var files = Directory.GetFiles(directoryPath);
+            foreach (var file in files)
+            {
+                var backedUpFile = new BackedUpFile()
                 {
-                    await SynchroniseAsync(dir).ConfigureAwait(false);
-                }
-                backedupDirectory.Modified = lastWrite;
-                // update dir on server
+                    Name = Path.GetFileName(file),
+                    Modified = Directory.GetLastWriteTimeUtc(file),
+                    ParentId = backedupDirectory.Id
+                };
+                // Upload file and object, link object to parent
+                var result = await Upload($"{_serverUri}/{WebApi.Upload}", file, backedUpFile)
+                    .ConfigureAwait(false);
+                backedUpFile = JsonConvert.DeserializeObject<BackedUpFile>(result);
+                if (backedUpFile == null) return false;
             }
-            if (lastWrite > backedupDirectory.Modified)
+            foreach (var dir in Directory.GetDirectories(directoryPath))
             {
-                update = true;
+                await SynchroniseAsync(dir, backedupDirectory.Id).ConfigureAwait(false);
             }
-            if (update)
-            {
+            backedupDirectory.Modified = lastWrite;
 
-            }
+            // update dir on server
+            //if (lastWrite > backedupDirectory.Modified)
+            //{
+            //    update = true;
+            //}
+            //if (update)
+            //{
+
+            //}
+            return true;
         }
 
         private async Task<BackedUpDirectory> GetDirectoryInfo(string directory, int? parentId = null)
@@ -102,14 +96,21 @@ namespace Client
                 .ConfigureAwait(false) as BackedUpDirectory;
         }
 
-        private async Task<string> Upload(string actionUrl, string filePath)
+        private async Task<string> Upload(string actionUrl, string filePath, BackedUpFile backedUpFile)
         {
             using (var client = new HttpClient())
             using (var formData = new MultipartFormDataContent())
             using (var fileStream = File.OpenRead(filePath))
             {
+                client.Timeout = new TimeSpan(0, 10, 0);
+                formData.Add(new StringContent(JsonConvert.SerializeObject(backedUpFile)), "backedUpFile");
                 formData.Add(new StringContent(filePath), "path");
-                formData.Add(new StreamContent(fileStream), "file");
+                //var streamContent = new StreamContent(fileStream);
+                //streamContent.Headers.ContentDisposition = new ContentDispositionHeaderValue("file")
+                //{
+                //    FileName = backedUpFile.Name
+                //};
+                formData.Add(new StreamContent(fileStream), "file", backedUpFile.Name);
                 using (var response = await client.PostAsync(actionUrl, formData))
                 {
                     var input = await response.Content.ReadAsStringAsync();
@@ -134,6 +135,7 @@ namespace Client
             }
             catch (Exception ex)
             {
+                //TODO: tracesource
                 return null;
             }
         }

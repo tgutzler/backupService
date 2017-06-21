@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
+using Newtonsoft.Json;
 using ServerApi.Database;
 using ServerApi.Options;
 
@@ -149,7 +150,13 @@ namespace ServerApi.Controllers
             }
 
             // Bind form data to a model
-            var backedUpFile = new BackedUpFile();
+            var formData = formAccumulator.GetResults();
+            BackedUpFile backedUpFile = null;
+            if (formData.TryGetValue("backedUpFile", out var values))
+            {
+                var jsonString = values[0];
+                backedUpFile = JsonConvert.DeserializeObject<BackedUpFile>(jsonString);
+            }
             var formValueProvider = new FormValueProvider(
                 BindingSource.Form,
                 new FormCollection(formAccumulator.GetResults()),
@@ -169,8 +176,17 @@ namespace ServerApi.Controllers
                 try
                 {
                     _dbService.AddFile(backedUpFile);
-                    System.IO.File.Move(tempFilePath,
-                        Path.Combine(_storageOptions.BackupRoot, backedUpFile.Hash));
+                    if (!Directory.Exists(_storageOptions.BackupRoot))
+                    {
+                        Directory.CreateDirectory(_storageOptions.BackupRoot);
+                    }
+                    var destPath = Path.Combine(_storageOptions.BackupRoot, backedUpFile.Hash);
+                    if (System.IO.File.Exists(destPath))
+                    {
+                        //TODO: back up
+                        System.IO.File.Delete(destPath);
+                    }
+                    System.IO.File.Move(tempFilePath, destPath);
                 }
                 catch (Exception ex)
                 {

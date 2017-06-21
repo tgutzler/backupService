@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using ServerApi.Database;
 using ServerApi.Interfaces;
 using ServerApi.Options;
+using Utils;
 
 namespace ServerApi.Controllers
 {
@@ -47,15 +48,17 @@ namespace ServerApi.Controllers
             }
         }
 
-        // GET api/directory
+        // POST api/directory
         [HttpPost]
+        [HttpPost("withfiles")]
         public IActionResult Get([FromBody] BUDirectoryInfo di)
         {
+            var includeChildren = Url.Action().Equals(WebApi.GetDirectoryWithFiles);
             try
             {
                 return di.ParentId == null ?
-                    Json(_dbService.GetDirectory(di.Path)) :
-                    Json(_dbService.GetDirectory(di.Name, (int)di.ParentId));
+                    Json(_dbService.GetDirectory(di.Path, includeChildren)) :
+                    Json(_dbService.GetDirectory(di.Name, (int)di.ParentId, includeChildren: includeChildren));
             }
             catch (Exception ex)
             {
@@ -63,21 +66,7 @@ namespace ServerApi.Controllers
             }
         }
 
-        // GET api/directory/sdf?parentId=1
-        //[HttpGet("{name}")]
-        //public IActionResult Get(string name, int parentId)
-        //{
-        //    try
-        //    {
-        //        return Json(_dbService.GetDirectory(name, parentId));
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return BadRequest(ex);
-        //    }
-        //}
-
-        // POST api/directory
+        // POST api/directory/add
         [HttpPost("Add")]
         public IActionResult Post([FromBody] BackedUpDirectory directory)
         {

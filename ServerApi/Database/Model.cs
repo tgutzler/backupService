@@ -120,6 +120,6 @@ namespace ServerApi.Database
         public BackedUpDirectory Parent { get; set; }
 
         [NotMapped]
-        public string Hash => DataUtils.MD5Hash($"{ParentId}{Path.AltDirectorySeparatorChar}Name");
+        public string Hash => DataUtils.MD5Hash($"{ParentId}{Path.AltDirectorySeparatorChar}{Name}");
     }
 }
