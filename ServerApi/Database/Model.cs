@@ -14,15 +14,23 @@ namespace ServerApi.Database
     {
         private IDatabaseConnectionConfig _connectionConfig;
 
+        public AppDbContext()
+        {
+            _connectionConfig = new SqliteDBConnectionConfig("DataSource=ServerApi.db");
+        }
+
         public AppDbContext(IDatabaseConnectionConfig connectionConfig)
         {
             _connectionConfig = connectionConfig;
         }
 
-//        public DbSet<BackupRoot> BackupRoots { get; set; }
         public DbSet<BackedUpDirectory> Directories { get; set; }
 
         public DbSet<BackedUpFile> Files { get; set; }
+
+        public DbSet<FileHistory> FileHistory { get; set; }
+
+        public DbSet<DirectoryHistory> DirectoryHistory { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -85,7 +93,7 @@ namespace ServerApi.Database
     //    public ICollection<BackedUpDirectory> Directories { get; set; }
     //}
 
-    [DataContract(Name = "BackedUpDirectory")]
+    [DataContract]
     public class BackedUpDirectory : BaseItem
     {
         public BackedUpDirectory()
@@ -97,8 +105,6 @@ namespace ServerApi.Database
         [DataMember]
         public string Name { get; set; }
         [DataMember]
-        public DateTime Modified { get; set; }
-        [DataMember]
         public UInt32 Depth { get; set; }
         [DataMember]
         public int? ParentId { get; set; }
@@ -106,20 +112,51 @@ namespace ServerApi.Database
         public ICollection<BackedUpDirectory> Directories { get; set; }
         [DataMember]
         public ICollection<BackedUpFile> Files { get; set; }
+        public ICollection<DirectoryHistory> History { get; set; }
+        [DataMember]
+        [NotMapped]
+        public DateTime Modified { get; set; }
+        [DataMember]
+        [NotMapped]
+        public bool Deleted { get; set; }
     }
 
-    [DataContract(Name = "BackedUpFile")]
+    [DataContract]
     public class BackedUpFile : BaseItem
     {
         [DataMember]
         public string Name { get; set; }
         [DataMember]
-        public DateTime Modified { get; set; }
-        [DataMember]
         public int ParentId { get; set; }
         public BackedUpDirectory Parent { get; set; }
-
+        public ICollection<FileHistory> History { get; set; }
+        [DataMember]
+        [NotMapped]
+        public DateTime Modified { get; set; }
+        [DataMember]
+        [NotMapped]
+        public bool Deleted { get; set; }
         [NotMapped]
         public string Hash => DataUtils.MD5Hash($"{ParentId}{Path.AltDirectorySeparatorChar}{Name}");
+
+    }
+
+    public class History : BaseItem
+    {
+        public DateTime Modified { get; set; }
+        public DateTime LastSeen { get; set; }
+        public bool Deleted { get; set; }
+    }
+
+    public class FileHistory : History
+    {
+        public int FileId { get; set; }
+        public BackedUpFile File { get; set; }
+    }
+
+    public class DirectoryHistory : History
+    {
+        public int DirectoryId { get; set; }
+        public BackedUpDirectory Directory { get; set; }
     }
 }

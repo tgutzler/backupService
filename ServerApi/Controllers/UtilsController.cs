@@ -2,10 +2,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using ServerApi.Options;
+using Utils;
 
 namespace ServerApi.Controllers
 {
-    [Route("api/[controller]/[action]")]
     public class UtilsController : Controller
     {
         private ApiOptions _apiOptions;
@@ -15,17 +15,10 @@ namespace ServerApi.Controllers
             _apiOptions = options.Value;
         }
 
-        // GET api/utils/ping
-        [HttpGet]
+        [HttpGet(WebApi.Ping)]
         public JsonResult Ping()
         {
             return Json(DateTime.Now.ToString());
-        }
-
-        [HttpGet]
-        public string Time()
-        {
-            return DateTime.Now.ToString();
         }
     }
 }

@@ -53,6 +53,12 @@ namespace ServerApi.Database
             using (var context = new AppDbContext(_dbConnectionConfig))
             {
                 context.Directories.Add(directory);
+                context.DirectoryHistory.Add(new DirectoryHistory()
+                {
+                    DirectoryId = directory.Id,
+                    LastSeen = DateTime.Now,
+                    Modified = directory.Modified
+                });
                 context.SaveChanges();
             }
         }
@@ -92,6 +98,13 @@ namespace ServerApi.Database
                             ParentId = parentId
                         };
                         context.Directories.Add(dir);
+                        var hist = new DirectoryHistory()
+                        {
+                            DirectoryId = dir.Id,
+                            LastSeen = DateTime.Now,
+                            Modified = dir.Modified
+                        };
+                        context.DirectoryHistory.Add(hist);
                         saveRequired = true;
                     }
                     parentId = dir.Id;
@@ -100,6 +113,10 @@ namespace ServerApi.Database
                 {
                     context.SaveChanges();
                 }
+                var history = context.DirectoryHistory.OrderByDescending(h => h.LastSeen)
+                    .FirstOrDefault(h => (h.DirectoryId == dir.Id));
+                dir.Modified = history.Modified;
+                dir.Deleted = history.Deleted;
                 if ((dir != null) && includeChildren)
                 {
                     context.Files.Where(f => f.ParentId == dir.Id).Load();
@@ -126,6 +143,10 @@ namespace ServerApi.Database
                     {
                         context.Directories.Where(d => d.Id == dir.ParentId).Load();
                     }
+                    var history = context.DirectoryHistory.OrderByDescending(h => h.LastSeen)
+                        .FirstOrDefault(h => (h.DirectoryId == dir.Id));
+                    dir.Modified = history.Modified;
+                    dir.Deleted = history.Deleted;
                 }
             }
             return dir;
@@ -148,24 +169,35 @@ namespace ServerApi.Database
                     {
                         context.Directories.Where(d => d.Id == dir.ParentId).Load();
                     }
+                    var history = context.DirectoryHistory.OrderByDescending(h => h.LastSeen)
+                        .FirstOrDefault(h => (h.DirectoryId == dir.Id));
+                    dir.Modified = history.Modified;
+                    dir.Deleted = history.Deleted;
                 }
             }
             return dir;
         }
 
-        public bool UpdateDirectory(BackedUpDirectory directory)
+        public void UpdateDirectory(BackedUpDirectory directory)
         {
             using (var context = new AppDbContext(_dbConnectionConfig))
             {
-                var dir = context.Directories.FirstOrDefault(d => d == directory);
-                if (dir == null) return false;
-                if (directory.Files != null)
+                //var dir = context.Directories.FirstOrDefault(d => d == directory);
+                //if (dir == null) return false;
+                //if (directory.Files != null)
+                //{
+                //    dir.Files = directory.Files;
+                //}
+                //dir.Modified = directory.Modified;
+                //context.SaveChanges();
+                //return true;
+                context.DirectoryHistory.Add(new DirectoryHistory()
                 {
-                    dir.Files = directory.Files;
-                }
-                dir.Modified = directory.Modified;
+                    DirectoryId = directory.Id,
+                    Modified = directory.Modified,
+                    LastSeen = DateTime.UtcNow
+                });
                 context.SaveChanges();
-                return true;
             }
         }
 
@@ -178,6 +210,12 @@ namespace ServerApi.Database
             using (var context = new AppDbContext(_dbConnectionConfig))
             {
                 context.Files.Add(file);
+                context.FileHistory.Add(new FileHistory()
+                {
+                    FileId = file.Id,
+                    LastSeen = DateTime.Now,
+                    Modified = file.Modified
+                });
                 context.SaveChanges();
             }
         }
@@ -200,8 +238,40 @@ namespace ServerApi.Database
                 {
                     context.Directories.Where(d => d.Id == file.ParentId).Load();
                 }
+                var history = context.FileHistory.OrderByDescending(h => h.LastSeen)
+                    .FirstOrDefault(h => (h.FileId == file.Id));
+                file.Modified = history.Modified;
+                file.Deleted = history.Deleted;
             }
             return file;
+        }
+
+        public void UpdateFile(BackedUpFile file)
+        {
+            using (var context = new AppDbContext(_dbConnectionConfig))
+            {
+                context.FileHistory.Add(new FileHistory()
+                {
+                    FileId = file.Id,
+                    LastSeen = DateTime.Now,
+                    Modified = file.Modified
+                });
+                context.SaveChanges();
+            }
+        }
+
+        public void DeleteFiles(List<BackedUpFile> files)
+        {
+            using (var context = new AppDbContext(_dbConnectionConfig))
+            {
+                files.ForEach(f => context.FileHistory.Add(new FileHistory()
+                {
+                    FileId = f.Id,
+                    LastSeen = DateTime.Now,
+                    Deleted = true
+                }));
+                context.SaveChanges();
+            }
         }
 
         public int DirectoryCount

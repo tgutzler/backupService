@@ -6,10 +6,16 @@ namespace Utils
 {
     public static class WebApi
     {
-        public static readonly string GetDirectory = "api/directory";
-        public static readonly string GetDirectoryWithFiles = "api/directory/withfiles";
-        public static readonly string Ping = "api/utils/ping";
-        public static readonly string Upload = "api/file/upload";
-    }
+        public const string Ping = "api/Utils/ping";
 
+        public const string AddDirectory = "api/Directory/add";
+        public const string GetDirectory = "api/Directory";
+        public const string GetDirectoryWithFiles = "api/Directory/withFiles";
+        public const string UpdateDirectory = "api/Directory/update";
+
+        public const string GetFile = "api/File";
+        public const string UploadFile = "api/File/upload";
+        public const string UpdateFile = "api/File/update";
+        public const string DeleteFiles = "api/File/deleteMany";
+    }
 }

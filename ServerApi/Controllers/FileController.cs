@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -14,10 +15,10 @@ using Microsoft.Net.Http.Headers;
 using Newtonsoft.Json;
 using ServerApi.Database;
 using ServerApi.Options;
+using Utils;
 
 namespace ServerApi.Controllers
 {
-    [Route("api/[controller]")]
     public class FileController : Controller
     {
         private ApiOptions _apiOptions;
@@ -31,7 +32,7 @@ namespace ServerApi.Controllers
             _dbService = DatabaseService.Instance;
         }
 
-        [HttpGet]
+        [HttpGet(WebApi.GetFile)]
         public string Get()
         {
             var count = _dbService.FileCount;
@@ -41,7 +42,7 @@ namespace ServerApi.Controllers
                 return $"There are {_dbService.FileCount} files backed up";
         }
 
-        [HttpGet("{id}")]
+        [HttpGet(WebApi.GetFile + "/{id}")]
         public IActionResult Get(int id)
         {
             try
@@ -54,8 +55,7 @@ namespace ServerApi.Controllers
             }
         }
 
-        // POST api/file
-        [HttpPost]
+        [HttpPost(WebApi.UpdateFile)]
         public IActionResult Post([FromBody] BackedUpFile file)
         {
             if (file == null)
@@ -65,7 +65,7 @@ namespace ServerApi.Controllers
 
             try
             {
-                _dbService.AddFile(file);
+                _dbService.UpdateFile(file);
                 return Json(file);
             }
             catch (Exception ex)
@@ -80,7 +80,7 @@ namespace ServerApi.Controllers
         //    do not want to read the request body early, the tokens are made to be 
         //    sent via headers. The antiforgery token filter first looks for tokens
         //    in the request header and then falls back to reading the body.
-        [HttpPost("Upload")]
+        [HttpPost(WebApi.UploadFile)]
         [DisableFormValueModelBinding]
 //        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Upload()
@@ -175,7 +175,14 @@ namespace ServerApi.Controllers
             {
                 try
                 {
-                    _dbService.AddFile(backedUpFile);
+                    if (backedUpFile.Id > 0)
+                    {
+                        _dbService.UpdateFile(backedUpFile);
+                    }
+                    else
+                    {
+                        _dbService.AddFile(backedUpFile);
+                    }
                     if (!Directory.Exists(_storageOptions.BackupRoot))
                     {
                         Directory.CreateDirectory(_storageOptions.BackupRoot);
@@ -196,6 +203,25 @@ namespace ServerApi.Controllers
 
             // filePath is where the file is
             return Json(backedUpFile);
+        }
+
+        [HttpPost(WebApi.DeleteFiles)]
+        public IActionResult DeleteMany([FromBody] List<BackedUpFile> files)
+        {
+            if (files == null)
+            {
+                return BadRequest();
+            }
+
+            try
+            {
+                _dbService.DeleteFiles(files);
+                return Json(true);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex);
+            }
         }
 
         private static Encoding GetEncoding(MultipartSection section)

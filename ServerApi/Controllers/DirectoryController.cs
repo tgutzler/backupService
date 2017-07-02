@@ -11,7 +11,6 @@ using Utils;
 
 namespace ServerApi.Controllers
 {
-    [Route("api/[controller]")]
     public class DirectoryController : Controller
     {
         private ApiOptions _apiOptions;
@@ -23,8 +22,7 @@ namespace ServerApi.Controllers
             _dbService = DatabaseService.Instance;
         }
 
-        // GET api/directory
-        [HttpGet]
+        [HttpGet(WebApi.GetDirectory)]
         public string Get()
         {
             var count = _dbService.DirectoryCount;
@@ -34,8 +32,7 @@ namespace ServerApi.Controllers
                 return $"There are {_dbService.DirectoryCount} directories backed up";
         }
 
-        // Get api/directory/1
-        [HttpGet("{id}")]
+        [HttpGet(WebApi.GetDirectory + "/{id}")]
         public IActionResult Get(int id)
         {
             try
@@ -49,11 +46,11 @@ namespace ServerApi.Controllers
         }
 
         // POST api/directory
-        [HttpPost]
-        [HttpPost("withfiles")]
+        [HttpPost(WebApi.GetDirectory)]
+        [HttpPost(WebApi.GetDirectoryWithFiles)]
         public IActionResult Get([FromBody] BUDirectoryInfo di)
         {
-            var includeChildren = Url.Action().Equals(WebApi.GetDirectoryWithFiles);
+            var includeChildren = Url.Action().EndsWith(WebApi.GetDirectoryWithFiles);
             try
             {
                 return di.ParentId == null ?
@@ -67,8 +64,8 @@ namespace ServerApi.Controllers
         }
 
         // POST api/directory/add
-        [HttpPost("Add")]
-        public IActionResult Post([FromBody] BackedUpDirectory directory)
+        [HttpPost(WebApi.AddDirectory)]
+        public IActionResult Add([FromBody] BackedUpDirectory directory)
         {
             if (directory == null)
             {
@@ -86,8 +83,8 @@ namespace ServerApi.Controllers
             return Json(directory);
         }
 
-        [HttpPut("Update")]
-        public IActionResult Put([FromBody] BackedUpDirectory directory)
+        [HttpPost(WebApi.UpdateDirectory)]
+        public IActionResult Update([FromBody] BackedUpDirectory directory)
         {
             if (directory == null)
             {
@@ -96,17 +93,13 @@ namespace ServerApi.Controllers
 
             try
             {
-                if (_dbService.UpdateDirectory(directory))
-                {
-                    return Json(directory);
-                }
+                _dbService.UpdateDirectory(directory);
+                return Json(directory);
             }
             catch (Exception ex)
             {
                 return BadRequest(ex);
             }
-            
-            return NotFound();
         }
     }
 }
