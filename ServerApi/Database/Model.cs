@@ -136,8 +136,6 @@ namespace ServerApi.Database
         [DataMember]
         [NotMapped]
         public bool Deleted { get; set; }
-        [NotMapped]
-        public string Hash => DataUtils.MD5Hash($"{ParentId}{Path.AltDirectorySeparatorChar}{Name}");
 
     }
 

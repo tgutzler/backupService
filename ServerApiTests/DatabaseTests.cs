@@ -60,7 +60,6 @@ namespace ServerApiTests
             Assert.True(dir.Equals(dir2));
             var file2 = _dbService.GetFile("file1", dir.Id);
             Assert.True(file1.Id == file2.Id);
-            Assert.True(file1.Hash == file2.Hash);
         }
 
         [Fact]

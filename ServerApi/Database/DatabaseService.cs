@@ -201,8 +201,9 @@ namespace ServerApi.Database
             }
         }
 
-        public void AddFile(BackedUpFile file)
+        public FileHistory AddFile(BackedUpFile file)
         {
+            FileHistory hist = null;
             if (file.ParentId <= 0)
             {
                 throw new InvalidDataException($"Cannot add file ({file.Name}) without a parent (ID:{file.ParentId})");
@@ -210,14 +211,17 @@ namespace ServerApi.Database
             using (var context = new AppDbContext(_dbConnectionConfig))
             {
                 context.Files.Add(file);
-                context.FileHistory.Add(new FileHistory()
+                hist = new FileHistory()
                 {
                     FileId = file.Id,
                     LastSeen = DateTime.Now,
                     Modified = file.Modified
-                });
+                };
+                context.FileHistory.Add(hist);
                 context.SaveChanges();
             }
+
+            return hist;
         }
 
         public BackedUpFile GetFile(int id)
@@ -246,18 +250,21 @@ namespace ServerApi.Database
             return file;
         }
 
-        public void UpdateFile(BackedUpFile file)
+        public FileHistory UpdateFile(BackedUpFile file)
         {
+            FileHistory hist = new FileHistory()
+            {
+                FileId = file.Id,
+                LastSeen = DateTime.Now,
+                Modified = file.Modified
+            };
             using (var context = new AppDbContext(_dbConnectionConfig))
             {
-                context.FileHistory.Add(new FileHistory()
-                {
-                    FileId = file.Id,
-                    LastSeen = DateTime.Now,
-                    Modified = file.Modified
-                });
+                context.FileHistory.Add(hist);
                 context.SaveChanges();
             }
+
+            return hist;
         }
 
         public void DeleteFiles(List<BackedUpFile> files)

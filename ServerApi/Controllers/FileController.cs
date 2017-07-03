@@ -175,23 +175,23 @@ namespace ServerApi.Controllers
             {
                 try
                 {
+                    FileHistory hist = null;
                     if (backedUpFile.Id > 0)
                     {
-                        _dbService.UpdateFile(backedUpFile);
+                        hist = _dbService.UpdateFile(backedUpFile);
                     }
                     else
                     {
-                        _dbService.AddFile(backedUpFile);
+                        hist = _dbService.AddFile(backedUpFile);
                     }
                     if (!Directory.Exists(_storageOptions.BackupRoot))
                     {
                         Directory.CreateDirectory(_storageOptions.BackupRoot);
                     }
-                    var destPath = Path.Combine(_storageOptions.BackupRoot, backedUpFile.Hash);
+                    var destPath = Path.Combine(_storageOptions.BackupRoot, $"{hist.Id}_{backedUpFile.Name}");
                     if (System.IO.File.Exists(destPath))
                     {
-                        //TODO: back up
-                        System.IO.File.Delete(destPath);
+                        throw new IOException($"file '{destPath}' exists when it shouldn't");
                     }
                     System.IO.File.Move(tempFilePath, destPath);
                 }

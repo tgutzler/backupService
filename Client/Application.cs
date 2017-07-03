@@ -78,14 +78,14 @@ namespace Client
             {
                 foreach (var watcher in watchers)
                 {
-                    RegisterEvents(watcher, true);
+                    RegisterEvents(watcher, false);
                 }
             }
         }
 
-        private void RegisterEvents(FileSystemWatcher watcher, bool unregister = false)
+        private void RegisterEvents(FileSystemWatcher watcher, bool register = true)
         {
-            if (unregister == false)
+            if (register)
             {
                 watcher.Created += Watcher_Modified;
                 watcher.Changed += Watcher_Modified;
