@@ -120,7 +120,24 @@ namespace ServerApi.Database
                 if ((dir != null) && includeChildren)
                 {
                     context.Files.Where(f => f.ParentId == dir.Id).Load();
-                    context.Directories.Where(d => d.ParentId == dir.Id).Load();
+                    foreach (var file in dir.Files)
+                    {
+                        var hist = (from h in context.FileHistory
+                                    orderby h.Modified descending
+                                    where h.FileId == file.Id
+                                    select h).First();
+                        file.Modified = hist.Modified;
+                    }
+                    context.Directories.Include(d => d.History)
+                        .Where(d => d.ParentId == dir.Id).Load();
+                    foreach (var subdir in dir.Directories)
+                    {
+                        var hist = (from h in context.DirectoryHistory
+                                    orderby h.Modified descending
+                                    where h.DirectoryId == subdir.Id
+                                    select h).First();
+                        subdir.Modified = hist.Modified;
+                    }
                 }
             }
             return dir;

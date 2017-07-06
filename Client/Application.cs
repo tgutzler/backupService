@@ -11,8 +11,8 @@ namespace Client
     internal class App
     {
         CancellationToken _token;
-        List<string> monitorDirs = new List<string> { @"C:\Users\tom\Documents\programming\C#\BackupService\test" };
-        List<FileSystemWatcher> watchers = new List<FileSystemWatcher>();
+        List<string> _monitorDirs = new List<string> { @"C:\Users\tom\Documents\programming\C#\BackupService\test" };
+        List<FileSystemWatcher> _watchers = new List<FileSystemWatcher>();
         Debouncer _modifiedDebouncer = new Debouncer();
         Debouncer _renamedDebouncer = new Debouncer();
         SyncEngine _syncEngine;
@@ -24,18 +24,19 @@ namespace Client
             _token = token;
             DebounceTimeMs = 10000;
 
-            _modifiedDebouncer.Debounced += ModifiedDebouncer_DebouncedAsync;
-            _renamedDebouncer.Debounced += RenamedDebouncer_DebouncedAsync;
+            _modifiedDebouncer.Debounced += ModifiedDebouncer_Debounced;
+            _renamedDebouncer.Debounced += RenamedDebouncer_Debounced;
 
             InitDatabaseAsync();
 
             _syncEngine = new SyncEngine(serverUri, "Tom");
+            ActionQueue.Instance.Initialise(token, _syncEngine);
         }
 
         public async Task RunAsync()
         {
             // Start monitoring FileSystem events for all given directories
-            foreach (var dir in monitorDirs)
+            foreach (var dir in _monitorDirs)
             {
                 Console.WriteLine($"Monitoring {dir}");
                 FileSystemWatcher watcher = new FileSystemWatcher()
@@ -45,6 +46,7 @@ namespace Client
                     EnableRaisingEvents = true
                 };
                 RegisterEvents(watcher);
+                _watchers.Add(watcher);
             }
 
             // Wait for server to come online
@@ -53,17 +55,20 @@ namespace Client
                 await Task.Delay(100, _token).ConfigureAwait(false);
                 _token.ThrowIfCancellationRequested();
             }
+            Console.WriteLine("Backup server online. Starting sync");
 
             // synchronise with server while collecting FileSystem events
             try
             {
-                var tasks = monitorDirs.Select(d => _syncEngine.SynchroniseAsync(d));
+                var tasks = _monitorDirs.Select(d => _syncEngine.SynchroniseAsync(d));
                 await Task.WhenAll(tasks).ConfigureAwait(false);
+
+                Console.WriteLine("Processing queued events");
+                ActionQueue.Instance.Paused = false;
                 // go through queued events
                 while (true)
                 {
                     await Task.Delay(1000, _token).ConfigureAwait(false);
-                    _token.ThrowIfCancellationRequested();
                 }
             }
             catch (OperationCanceledException)
@@ -76,7 +81,7 @@ namespace Client
             }
             finally
             {
-                foreach (var watcher in watchers)
+                foreach (var watcher in _watchers)
                 {
                     RegisterEvents(watcher, false);
                 }
@@ -140,40 +145,32 @@ namespace Client
             _modifiedDebouncer.Start(e.FullPath, e, DebounceTimeMs);
         }
 
-        private async void RenamedDebouncer_DebouncedAsync(object sender, object o)
+        private void RenamedDebouncer_Debounced(object sender, object o)
         {
-            if ((o is DebouncerEventArgs a) && (a.Object is RenamedEventArgs e))
+            if ((o is DebouncerEventArgs a) && (a.Args is RenamedEventArgs e))
             {
                 Console.WriteLine($"{e.ChangeType}: {e.OldFullPath} -> {e.FullPath}");
-                using (var context = new AppDbContext())
+                ActionQueue.Instance.Add(new ItemAction()
                 {
-                    await context.Actions.AddAsync(new ItemAction()
-                    {
-                        Action = e.ChangeType,
-                        OldPath = e.OldFullPath,
-                        Path = e.FullPath,
-                        Updated = DateTime.Now
-                    }).ConfigureAwait(false);
-                    await context.SaveChangesAsync().ConfigureAwait(false);
-                }
+                    Action = e.ChangeType,
+                    OldPath = e.OldFullPath,
+                    Path = e.FullPath,
+                    Updated = DateTime.Now
+                });                
             }
         }
 
-        private async void ModifiedDebouncer_DebouncedAsync(object sender, object o)
+        private void ModifiedDebouncer_Debounced(object sender, object o)
         {
-            if ((o is DebouncerEventArgs a) && (a.Object is FileSystemEventArgs e))
+            if ((o is DebouncerEventArgs a) && (a.Args is FileSystemEventArgs e))
             {
                 Console.WriteLine($"{e.ChangeType}: {e.FullPath}");
-                using (var context = new AppDbContext())
+                ActionQueue.Instance.Add(new ItemAction()
                 {
-                    await context.Actions.AddAsync(new ItemAction()
-                    {
-                        Action = e.ChangeType,
-                        Path = e.FullPath,
-                        Updated = DateTime.Now
-                    }).ConfigureAwait(false);
-                    await context.SaveChangesAsync().ConfigureAwait(false);
-                }
+                    Action = e.ChangeType,
+                    Path = e.FullPath,
+                    Updated = DateTime.Now
+                });
             }
         }
 
@@ -192,35 +189,36 @@ namespace Client
 
     internal class Debouncer
     {
-        private ConcurrentDictionary<string, ObjectContainer> _dict;
+        private ConcurrentDictionary<DictionaryKey, ObjectContainer> _dict;
 
         public event EventHandler<object> Debounced;
 
         public Debouncer()
         {
-            _dict = new ConcurrentDictionary<string, ObjectContainer>();
+            _dict = new ConcurrentDictionary<DictionaryKey, ObjectContainer>();
         }
 
         /// <summary>
         /// Sets the debounce object and debounce time
         /// If debouncing is already in progres, updates the debounce object
         /// </summary>
-        /// <param name="o">Object to be returned by the Debounced event</param>
+        /// <param name="args">Object to be returned by the Debounced event</param>
         /// <param name="dueTime">The amount of debeounce time in milliseconds</param>
         /// <returns>true if debouncing is not already in progress</returns>
-        public bool Start(string item, object o, int dueTime)
+        public bool Start(string path, FileSystemEventArgs args, int dueTime)
         {
             bool started = false;
-            if (_dict.TryGetValue(item, out ObjectContainer oc))
+            var key = new DictionaryKey { Path = path, ChangeType = args.ChangeType };
+            if (_dict.TryGetValue(key, out ObjectContainer oc))
             {
-                oc.Object = o;
+                oc.Args = args;
             }
             else
             {
-                var container = new ObjectContainer(item, o);
+                var container = new ObjectContainer(key, args);
                 var t = new Timer(DebouncerCallback, container, dueTime, Timeout.Infinite);
                 container.Timer = t;
-                _dict.TryAdd(item, container);
+                _dict.TryAdd(key, container);
                 started = true;
             }
 
@@ -234,26 +232,32 @@ namespace Client
                 oc.Timer.Dispose();
                 _dict.TryRemove(oc.Key, out ObjectContainer tmp);
                 var args = new DebouncerEventArgs()
-                { Object = oc.Object };
+                { Args = oc.Args };
                 Debounced?.Invoke(this, args);
             }
         }
 
         private class ObjectContainer
         {
-            public ObjectContainer(string key, object o)
+            public ObjectContainer(DictionaryKey key, FileSystemEventArgs args)
             {
                 Key = key;
-                Object = o;
+                Args = args;
             }
-            public string Key { get; set; }
+            public DictionaryKey Key { get; set; }
             public Timer Timer { get; set; }
-            public object Object { get; set; }
+            public FileSystemEventArgs Args { get; set; }
         }
+    }
+
+    internal class DictionaryKey
+    {
+        public string Path { get; set; }
+        public WatcherChangeTypes ChangeType { get; set; }
     }
 
     internal class DebouncerEventArgs : EventArgs
     {
-        public object Object { get; set; }
+        public FileSystemEventArgs Args { get; set; }
     }
 }

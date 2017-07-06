@@ -114,7 +114,6 @@ namespace ServerApi.Controllers
                         using (var targetStream = System.IO.File.Create(tempFilePath))
                         {
                             await section.Body.CopyToAsync(targetStream);
-                            //_logger.LogInformation($"Copied the uploaded file '{targetFilePath}'");
                         }
                     }
                     else if (MultipartRequestHelper.HasFormDataContentDisposition(contentDisposition))
@@ -156,6 +155,20 @@ namespace ServerApi.Controllers
             {
                 var jsonString = values[0];
                 backedUpFile = JsonConvert.DeserializeObject<BackedUpFile>(jsonString);
+                if (backedUpFile.ParentId == 0)
+                {
+                    if (formData.TryGetValue("path", out var path))
+                    {
+                        path = Path.GetDirectoryName(path)
+                            .Replace(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        var dir = _dbService.GetDirectory(path);
+                        backedUpFile.ParentId = dir.Id;
+                    }
+                }
+            }
+            if (backedUpFile.ParentId == 0)
+            {
+                throw new Exception($"{backedUpFile.Name} has no parent");
             }
             var formValueProvider = new FormValueProvider(
                 BindingSource.Form,

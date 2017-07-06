@@ -52,13 +52,14 @@ namespace Client
         {
             var directoryName = DirectoryName(directoryPath);
             var lastWrite = Directory.GetLastWriteTimeUtc(directoryPath);
-            Console.WriteLine($"Press any key to start {directoryName} ({directoryPath})");
-            Console.ReadKey();
+            //Console.WriteLine($"Press ENTER to start {directoryName} ({directoryPath})");
+            //Console.ReadLine();
             var backedupDirectory = await GetDirectoryInfo(directoryPath, parentId).ConfigureAwait(false) ??
                 await AddDirectory(directoryName, parentId).ConfigureAwait(false);
             var dirWasModified = backedupDirectory.Modified != lastWrite;
             if (dirWasModified)
             {
+                Console.WriteLine($"{directoryPath} was modified. Checking files");
                 backedupDirectory = await GetDirectoryInfo(directoryPath, parentId, true).ConfigureAwait(false);
                 var filesToBackup = Directory.GetFiles(directoryPath);
 
@@ -79,6 +80,7 @@ namespace Client
                 await UpdateDirectory(backedupDirectory).ConfigureAwait(false);
             }
 
+            Console.WriteLine($"done synchronising {directoryPath}");
             return true;
         }
 
@@ -94,8 +96,9 @@ namespace Client
                     Modified = Directory.GetLastWriteTimeUtc(filePath),
                     ParentId = directory.Id
                 };
+                Console.WriteLine($"Uploading new file {fileName}");
                 // Upload file and object, link object to parent
-                var result = await Upload($"{_serverUri}/{WebApi.UploadFile}", filePath, backedUpFile)
+                var result = await Upload(filePath, backedUpFile)
                     .ConfigureAwait(false);
                 backedUpFile = JsonConvert.DeserializeObject<BackedUpFile>(result);
             }
@@ -104,8 +107,9 @@ namespace Client
                 var lastWrite = Directory.GetLastWriteTimeUtc(filePath);
                 if (lastWrite > backedUpFile.Modified)
                 {
+                    Console.WriteLine($"Uploading modified file {fileName}");
                     backedUpFile.Modified = lastWrite;
-                    var result = await Upload($"{_serverUri}/{WebApi.UploadFile}", filePath, backedUpFile)
+                    var result = await Upload(filePath, backedUpFile)
                         .ConfigureAwait(false);
                     backedUpFile = JsonConvert.DeserializeObject<BackedUpFile>(result);
                 }
@@ -130,7 +134,9 @@ namespace Client
             }
             if (filesToDelete.Count > 0)
             {
-                var result = await GetFromPost($"{_serverUri}/{WebApi.DeleteFiles}", JsonConvert.SerializeObject(filesToDelete))
+                Console.WriteLine($"Deleting: {string.Join(", ", filesToDelete)}");
+                var result = await GetFromPost($"{_serverUri}/{WebApi.DeleteFiles}",
+                    JsonConvert.SerializeObject(filesToDelete), typeof(bool))
                     .ConfigureAwait(false);
             }
         }
@@ -142,7 +148,8 @@ namespace Client
                 new BUDirectoryInfo(parentId, DirectoryName(directory));
             return await GetFromPost($"{_serverUri}/"
                 + (includeFiles ? WebApi.GetDirectoryWithFiles : WebApi.GetDirectory),
-                JsonConvert.SerializeObject(di)).ConfigureAwait(false) as BackedUpDirectory;
+                JsonConvert.SerializeObject(di), typeof(BackedUpDirectory))
+                .ConfigureAwait(false) as BackedUpDirectory;
         }
 
         private async Task<BackedUpDirectory> AddDirectory(string directoryName, int? parentId = null)
@@ -152,19 +159,21 @@ namespace Client
                 Name = directoryName,
                 ParentId = parentId
             };
-            dir = await GetFromPost($"{_serverUri}/{WebApi.AddDirectory}", JsonConvert.SerializeObject(dir))
+            dir = await GetFromPost($"{_serverUri}/{WebApi.AddDirectory}",
+                JsonConvert.SerializeObject(dir), typeof(BackedUpDirectory))
                 .ConfigureAwait(false) as BackedUpDirectory;
             return dir;
         }
 
         private async Task<BackedUpDirectory> UpdateDirectory(BackedUpDirectory directory)
         {
-            directory = await GetFromPost($"{_serverUri}/{WebApi.UpdateDirectory}", JsonConvert.SerializeObject(directory))
+            directory = await GetFromPost($"{_serverUri}/{WebApi.UpdateDirectory}",
+                JsonConvert.SerializeObject(directory), typeof(BackedUpDirectory))
                 .ConfigureAwait(false) as BackedUpDirectory;
             return directory;
         }
 
-        private async Task<string> Upload(string actionUrl, string filePath, BackedUpFile backedUpFile)
+        public async Task<string> Upload(string filePath, BackedUpFile backedUpFile)
         {
             using (var client = new HttpClient() { Timeout = httpClientTimeout })
             using (var formData = new MultipartFormDataContent())
@@ -172,13 +181,8 @@ namespace Client
             {
                 formData.Add(new StringContent(JsonConvert.SerializeObject(backedUpFile)), "backedUpFile");
                 formData.Add(new StringContent(filePath), "path");
-                //var streamContent = new StreamContent(fileStream);
-                //streamContent.Headers.ContentDisposition = new ContentDispositionHeaderValue("file")
-                //{
-                //    FileName = backedUpFile.Name
-                //};
                 formData.Add(new StreamContent(fileStream), "file", backedUpFile.Name);
-                using (var response = await client.PostAsync(actionUrl, formData))
+                using (var response = await client.PostAsync($"{_serverUri}/{WebApi.UploadFile}", formData))
                 {
                     var input = await response.Content.ReadAsStringAsync();
                     if (!response.IsSuccessStatusCode)
@@ -190,7 +194,7 @@ namespace Client
             }
         }
 
-        private async Task<object> GetFromPost(string requestUri, string stringContent)
+        private async Task<object> GetFromPost(string requestUri, string stringContent, Type returnType)
         {
             using (var client = new HttpClient() { Timeout = httpClientTimeout })
             {
@@ -201,7 +205,7 @@ namespace Client
                     throw new HttpRequestException($"Invalid request to {requestUri}. Content: {stringContent}");
                 }
                 var stringResult = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
-                var dir = JsonConvert.DeserializeObject(stringResult, typeof(BackedUpDirectory));
+                var dir = JsonConvert.DeserializeObject(stringResult, returnType);
                 return dir;
             }
         }
